@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Pong</title>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            background: #111;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// Paddle
+const paddleWidth = 10;
+const paddleHeight = 100;
+
+let leftY = 200;
+let rightY = 200;
+
+// Ball
+let ballX = 400;
+let ballY = 250;
+let ballSize = 10;
+
+let ballSpeedX = 4;
+let ballSpeedY = 4;
+
+// Steuerung
+let upPressed = false;
+let downPressed = false;
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") upPressed = true;
+    if (e.key === "ArrowDown") downPressed = true;
+});
+
+document.addEventListener("keyup", (e) => {
+    if (e.key === "ArrowUp") upPressed = false;
+    if (e.key === "ArrowDown") downPressed = false;
+});
+
+// Spiel-Loop
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Spieler bewegen
+    if (upPressed) rightY -= 5;
+    if (downPressed) rightY += 5;
+
+    // einfache KI links
+    if (ballY < leftY + paddleHeight / 2) leftY -= 3;
+    if (ballY > leftY + paddleHeight / 2) leftY += 3;
+
+    // Ball bewegen
+    ballX += ballSpeedX;
+    ballY += ballSpeedY;
+
+    // Kollision oben/unten
+    if (ballY <= 0 || ballY >= canvas.height) {
+        ballSpeedY *= -1;
+    }
+
+    // Kollision links
+    if (
+        ballX <= paddleWidth &&
+        ballY > leftY &&
+        ballY < leftY + paddleHeight
+    ) {
+        ballSpeedX *= -1;
+    }
+
+    // Kollision rechts
+    if (
+        ballX >= canvas.width - paddleWidth &&
+        ballY > rightY &&
+        ballY < rightY + paddleHeight
+    ) {
+        ballSpeedX *= -1;
+    }
+
+    // Reset wenn raus
+    if (ballX < 0 || ballX > canvas.width) {
+        ballX = 400;
+        ballY = 250;
+    }
+
+    // Zeichnen
+    ctx.fillStyle = "white";
+
+    // linkes Paddle
+    ctx.fillRect(0, leftY, paddleWidth, paddleHeight);
+
+    // rechtes Paddle
+    ctx.fillRect(canvas.width - paddleWidth, rightY, paddleWidth, paddleHeight);
+
+    // Ball
+    ctx.fillRect(ballX, ballY, ballSize, ballSize);
+
+    requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+
+</body>
+</html>
