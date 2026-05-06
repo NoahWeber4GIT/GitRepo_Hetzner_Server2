@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe | Noah's Spieleportal</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 8px;
+            background: rgba(233,69,96,0.1);
+            padding: 8px;
+            border-radius: 12px;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: #1a1a2e;
+            border: 2px solid rgba(233,69,96,0.3);
+            border-radius: 8px;
+            font-size: 2.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+        }
+        .cell:hover:not(.taken) {
+            background: rgba(233,69,96,0.2);
+            border-color: #e94560;
+        }
+        .cell.x { color: #e94560; }
+        .cell.o { color: #4ecdc4; }
+        .cell.taken { cursor: not-allowed; }
+        .cell.win { 
+            animation: winPulse 0.5s ease infinite alternate;
+            border-color: #f5a623;
+            box-shadow: 0 0 20px rgba(245,166,35,0.5);
+        }
+        @keyframes winPulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="game-page">
+    <header class="game-header">
+        <a href="../index.html" class="back-btn">← Zurück</a>
+        <h1>❌⭕ Tic Tac Toe</h1>
+    </header>
+    
+    <div class="game-container">
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('pvp')">👥 2 Spieler</button>
+            <button class="mode-btn" onclick="setMode('bot')">🤖 Gegen Bot</button>
+        </div>
+        
+        <div class="status-text" id="status">Spieler X beginnt!</div>
+        
+        <div class="board" id="board">
+            <button class="cell" data-index="0"></button>
+            <button class="cell" data-index="1"></button>
+            <button class="cell" data-index="2"></button>
+            <button class="cell" data-index="3"></button>
+            <button class="cell" data-index="4"></button>
+            <button class="cell" data-index="5"></button>
+            <button class="cell" data-index="6"></button>
+            <button class="cell" data-index="7"></button>
+            <button class="cell" data-index="8"></button>
+        </div>
+        
+        <button class="btn" onclick="resetGame()">🔄 Neues Spiel</button>
+    </div>
+
+    <script>
+        let board = ['','','','','','','','',''];
+        let currentPlayer = 'X';
+        let gameOver = false;
+        let mode = 'pvp';
+        
+        const winPatterns = [
+            [0,1,2], [3,4,5], [6,7,8],
+            [0,3,6], [1,4,7], [2,5,8],
+            [0,4,8], [2,4,6]
+        ];
+        
+        const cells = document.querySelectorAll('.cell');
+        const status = document.getElementById('status');
+        
+        cells.forEach(cell => {
+            cell.addEventListener('click', () => makeMove(cell));
+        });
+        
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            resetGame();
+        }
+        
+        function makeMove(cell) {
+            const index = cell.dataset.index;
+            
+            if (board[index] !== '' || gameOver) return;
+            if (mode === 'bot' && currentPlayer === 'O') return;
+            
+            board[index] = currentPlayer;
+            cell.textContent = currentPlayer;
+            cell.classList.add('taken', currentPlayer.toLowerCase());
+            
+            if (checkWin(currentPlayer)) {
+                gameOver = true;
+                status.textContent = `🎉 Spieler ${currentPlayer} gewinnt!`;
+                return;
+            }
+            
+            if (board.every(c => c !== '')) {
+                gameOver = true;
+                status.textContent = '🤝 Unentschieden!';
+                return;
+            }
+            
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            status.textContent = `Spieler ${currentPlayer} ist dran`;
+            
+            if (mode === 'bot' && currentPlayer === 'O' && !gameOver) {
+                setTimeout(botMove, 400);
+            }
+        }
+        
+        function botMove() {
+            // Simple AI: try to win, block, or random
+            let move = findWinningMove('O') ?? findWinningMove('X') ?? getRandomMove();
+            if (move !== null) {
+                const cell = cells[move];
+                board[move] = 'O';
+                cell.textContent = 'O';
+                cell.classList.add('taken', 'o');
+                
+                if (checkWin('O')) {
+                    gameOver = true;
+                    status.textContent = '🤖 Bot gewinnt!';
+                    return;
+                }
+                
+                if (board.every(c => c !== '')) {
+                    gameOver = true;
+                    status.textContent = '🤝 Unentschieden!';
+                    return;
+                }
+                
+                currentPlayer = 'X';
+                status.textContent = 'Spieler X ist dran';
+            }
+        }
+        
+        function findWinningMove(player) {
+            for (let i = 0; i < 9; i++) {
+                if (board[i] === '') {
+                    board[i] = player;
+                    if (checkWin(player, false)) {
+                        board[i] = '';
+                        return i;
+                    }
+                    board[i] = '';
+                }
+            }
+            return null;
+        }
+        
+        function getRandomMove() {
+            // Prefer center, then corners, then edges
+            const center = 4;
+            const corners = [0,2,6,8];
+            const edges = [1,3,5,7];
+            
+            if (board[center] === '') return center;
+            
+            const availCorners = corners.filter(i => board[i] === '');
+            if (availCorners.length) return availCorners[Math.floor(Math.random() * availCorners.length)];
+            
+            const availEdges = edges.filter(i => board[i] === '');
+            if (availEdges.length) return availEdges[Math.floor(Math.random() * availEdges.length)];
+            
+            return null;
+        }
+        
+        function checkWin(player, highlight = true) {
+            for (const pattern of winPatterns) {
+                if (pattern.every(i => board[i] === player)) {
+                    if (highlight) {
+                        pattern.forEach(i => cells[i].classList.add('win'));
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function resetGame() {
+            board = ['','','','','','','','',''];
+            currentPlayer = 'X';
+            gameOver = false;
+            cells.forEach(cell => {
+                cell.textContent = '';
+                cell.className = 'cell';
+            });
+            status.textContent = 'Spieler X beginnt!';
+        }
+    </script>
+</body>
+</html>

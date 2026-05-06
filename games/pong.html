@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong | Noah's Spieleportal</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        canvas {
+            border: 2px solid rgba(233,69,96,0.5);
+            border-radius: 8px;
+            background: #0a0a15;
+            box-shadow: 0 0 40px rgba(233,69,96,0.2);
+        }
+        .controls-info {
+            margin-top: 16px;
+            color: #555;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        .controls-info span { color: #888; }
+    </style>
+</head>
+<body class="game-page">
+    <header class="game-header">
+        <a href="../index.html" class="back-btn">← Zurück</a>
+        <h1>🏓 Pong</h1>
+    </header>
+    
+    <div class="game-container">
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('pvp')">👥 2 Spieler</button>
+            <button class="mode-btn" onclick="setMode('bot')">🤖 Gegen Bot</button>
+        </div>
+        
+        <div class="score-board">
+            <div class="score-item">
+                <div class="label" id="p1label">Spieler 1</div>
+                <div class="value" id="score1">0</div>
+            </div>
+            <div class="score-item">
+                <div class="label" id="p2label">Spieler 2</div>
+                <div class="value" id="score2">0</div>
+            </div>
+        </div>
+        
+        <canvas id="pongCanvas" width="700" height="400"></canvas>
+        
+        <div class="controls-info" id="controls">
+            <span>Spieler 1: W/S</span> &nbsp;|&nbsp; <span>Spieler 2: ↑/↓</span>
+        </div>
+        
+        <div class="status-text" id="status" style="margin-top:12px;">Drücke LEERTASTE zum Starten</div>
+        <button class="btn" onclick="resetGame()">🔄 Neu starten</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let mode = 'pvp';
+        let gameRunning = false;
+        let animFrame;
+        
+        const PADDLE_W = 12, PADDLE_H = 80, BALL_SIZE = 10;
+        const SPEED = 5;
+        
+        let state = {};
+        
+        function initState() {
+            state = {
+                ball: { x: canvas.width/2, y: canvas.height/2, vx: SPEED * (Math.random() > 0.5 ? 1 : -1), vy: SPEED * (Math.random() > 0.5 ? 0.8 : -0.8) },
+                p1: { y: canvas.height/2 - PADDLE_H/2, score: 0 },
+                p2: { y: canvas.height/2 - PADDLE_H/2, score: 0 },
+                keys: {}
+            };
+        }
+        
+        initState();
+        
+        document.addEventListener('keydown', e => {
+            state.keys[e.key] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (!gameRunning) startGame();
+            }
+        });
+        document.addEventListener('keyup', e => { state.keys[e.key] = false; });
+        
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('p2label').textContent = m === 'bot' ? 'Bot' : 'Spieler 2';
+            document.getElementById('controls').innerHTML = m === 'bot' 
+                ? '<span>Spieler: W/S oder ↑/↓</span>'
+                : '<span>Spieler 1: W/S</span> &nbsp;|&nbsp; <span>Spieler 2: ↑/↓</span>';
+            resetGame();
+        }
+        
+        function startGame() {
+            gameRunning = true;
+            document.getElementById('status').textContent = '';
+            loop();
+        }
+        
+        function resetGame() {
+            cancelAnimationFrame(animFrame);
+            gameRunning = false;
+            initState();
+            document.getElementById('score1').textContent = '0';
+            document.getElementById('score2').textContent = '0';
+            document.getElementById('status').textContent = 'Drücke LEERTASTE zum Starten';
+            draw();
+        }
+        
+        function loop() {
+            update();
+            draw();
+            if (gameRunning) animFrame = requestAnimationFrame(loop);
+        }
+        
+        function update() {
+            const s = state;
+            const pSpeed = 6;
+            
+            // Player 1 movement (W/S)
+            if (s.keys['w'] || s.keys['W'] || s.keys['ArrowUp'] && mode === 'bot') {
+                s.p1.y = Math.max(0, s.p1.y - pSpeed);
+            }
+            if (s.keys['s'] || s.keys['S'] || s.keys['ArrowDown'] && mode === 'bot') {
+                s.p1.y = Math.min(canvas.height - PADDLE_H, s.p1.y + pSpeed);
+            }
+            
+            // Player 2 / Bot
+            if (mode === 'pvp') {
+                if (s.keys['ArrowUp']) s.p2.y = Math.max(0, s.p2.y - pSpeed);
+                if (s.keys['ArrowDown']) s.p2.y = Math.min(canvas.height - PADDLE_H, s.p2.y + pSpeed);
+            } else {
+                // Bot AI
+                const botCenter = s.p2.y + PADDLE_H/2;
+                const diff = s.ball.y - botCenter;
+                const botSpeed = Math.min(Math.abs(diff), pSpeed * 0.85);
+                s.p2.y += diff > 0 ? botSpeed : -botSpeed;
+                s.p2.y = Math.max(0, Math.min(canvas.height - PADDLE_H, s.p2.y));
+            }
+            
+            // Ball movement
+            s.ball.x += s.ball.vx;
+            s.ball.y += s.ball.vy;
+            
+            // Top/Bottom walls
+            if (s.ball.y <= 0 || s.ball.y >= canvas.height - BALL_SIZE) {
+                s.ball.vy *= -1;
+            }
+            
+            // Paddle collisions
+            // P1 paddle (left)
+            if (s.ball.x <= 30 + PADDLE_W && s.ball.x >= 30 &&
+                s.ball.y + BALL_SIZE >= s.p1.y && s.ball.y <= s.p1.y + PADDLE_H) {
+                s.ball.vx = Math.abs(s.ball.vx) * 1.05;
+                const hitPos = (s.ball.y - s.p1.y) / PADDLE_H - 0.5;
+                s.ball.vy = hitPos * SPEED * 2;
+            }
+            
+            // P2 paddle (right)
+            if (s.ball.x + BALL_SIZE >= canvas.width - 30 - PADDLE_W && s.ball.x + BALL_SIZE <= canvas.width - 30 &&
+                s.ball.y + BALL_SIZE >= s.p2.y && s.ball.y <= s.p2.y + PADDLE_H) {
+                s.ball.vx = -Math.abs(s.ball.vx) * 1.05;
+                const hitPos = (s.ball.y - s.p2.y) / PADDLE_H - 0.5;
+                s.ball.vy = hitPos * SPEED * 2;
+            }
+            
+            // Cap ball speed
+            const maxSpeed = 15;
+            s.ball.vx = Math.max(-maxSpeed, Math.min(maxSpeed, s.ball.vx));
+            s.ball.vy = Math.max(-maxSpeed, Math.min(maxSpeed, s.ball.vy));
+            
+            // Scoring
+            if (s.ball.x < 0) {
+                s.p2.score++;
+                document.getElementById('score2').textContent = s.p2.score;
+                resetBall();
+            }
+            if (s.ball.x > canvas.width) {
+                s.p1.score++;
+                document.getElementById('score1').textContent = s.p1.score;
+                resetBall();
+            }
+            
+            // Win condition
+            if (s.p1.score >= 7 || s.p2.score >= 7) {
+                gameRunning = false;
+                const winner = s.p1.score >= 7 ? (mode === 'bot' ? 'Spieler' : 'Spieler 1') : (mode === 'bot' ? 'Bot' : 'Spieler 2');
+                document.getElementById('status').textContent = `🏆 ${winner} gewinnt!`;
+            }
+        }
+        
+        function resetBall() {
+            state.ball = { 
+                x: canvas.width/2, y: canvas.height/2, 
+                vx: SPEED * (Math.random() > 0.5 ? 1 : -1), 
+                vy: SPEED * (Math.random() > 0.5 ? 0.8 : -0.8) 
+            };
+        }
+        
+        function draw() {
+            const s = state;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Center line
+            ctx.setLineDash([10, 10]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Paddles
+            ctx.fillStyle = '#e94560';
+            roundRect(ctx, 30, s.p1.y, PADDLE_W, PADDLE_H, 4);
+            ctx.fillStyle = '#4ecdc4';
+            roundRect(ctx, canvas.width - 30 - PADDLE_W, s.p2.y, PADDLE_W, PADDLE_H, 4);
+            
+            // Ball
+            ctx.fillStyle = '#f5a623';
+            ctx.beginPath();
+            ctx.arc(s.ball.x + BALL_SIZE/2, s.ball.y + BALL_SIZE/2, BALL_SIZE/2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Glow
+            ctx.shadowColor = '#f5a623';
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, r);
+            ctx.fill();
+        }
+        
+        draw();
+    </script>
+</body>
+</html>
